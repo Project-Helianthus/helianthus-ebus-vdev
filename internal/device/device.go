@@ -1,6 +1,6 @@
 package device
 
-import "github.com/d3vi1/helianthus-ebusgo/emulation"
+import "github.com/Project-Helianthus/helianthus-ebusgo/emulation"
 
 // Device represents a virtual eBUS device that can be emulated on the bus.
 type Device interface {

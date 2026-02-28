@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/d3vi1/helianthus-ebusgo/emulation"
-	"github.com/d3vi1/helianthus-ebusgo/transport"
+	"github.com/Project-Helianthus/helianthus-ebusgo/emulation"
+	"github.com/Project-Helianthus/helianthus-ebusgo/transport"
 
-	"github.com/d3vi1/helianthus-ebus-vdev/internal/bus"
-	"github.com/d3vi1/helianthus-ebus-vdev/internal/config"
-	"github.com/d3vi1/helianthus-ebus-vdev/internal/datasource"
-	"github.com/d3vi1/helianthus-ebus-vdev/internal/device/thermostat"
+	"github.com/Project-Helianthus/helianthus-ebus-vdev/internal/bus"
+	"github.com/Project-Helianthus/helianthus-ebus-vdev/internal/config"
+	"github.com/Project-Helianthus/helianthus-ebus-vdev/internal/datasource"
+	"github.com/Project-Helianthus/helianthus-ebus-vdev/internal/device/thermostat"
 )
 
 const preflightDuration = 3 * time.Second

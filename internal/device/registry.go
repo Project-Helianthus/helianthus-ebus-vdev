@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/d3vi1/helianthus-ebusgo/emulation"
+	"github.com/Project-Helianthus/helianthus-ebusgo/emulation"
 )
 
 // Registry manages active virtual devices keyed by their slave address.

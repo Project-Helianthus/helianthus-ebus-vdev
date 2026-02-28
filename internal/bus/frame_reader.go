@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	ebuserrors "github.com/d3vi1/helianthus-ebusgo/errors"
-	"github.com/d3vi1/helianthus-ebusgo/protocol"
-	"github.com/d3vi1/helianthus-ebusgo/transport"
+	ebuserrors "github.com/Project-Helianthus/helianthus-ebusgo/errors"
+	"github.com/Project-Helianthus/helianthus-ebusgo/protocol"
+	"github.com/Project-Helianthus/helianthus-ebusgo/transport"
 )
 
 // ParsedFrame holds a parsed eBUS frame along with the time it was fully received.

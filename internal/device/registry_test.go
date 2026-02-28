@@ -3,7 +3,7 @@ package device
 import (
 	"testing"
 
-	"github.com/d3vi1/helianthus-ebusgo/emulation"
+	"github.com/Project-Helianthus/helianthus-ebusgo/emulation"
 )
 
 func TestRegistry_AddAndLookup(t *testing.T) {
