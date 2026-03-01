@@ -1,0 +1,87 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  terminology:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          # Exclude files where eBUS protocol terminology is unavoidable
+          if git grep -nIwiE 'm[a]ster|s[l]ave' -- \
+              ':!README.md' \
+              ':!AGENTS.md' \
+              ':!cmd/vdev/main.go' \
+              ':!internal/bus/' \
+              ':!internal/config/' \
+              ':!internal/device/'; then
+            echo "Found legacy terminology."
+            exit 1
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/Project-Helianthus/*
+      GONOSUMDB: github.com/Project-Helianthus/*
+      GOPROXY: direct
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          TOKEN="${{ secrets.REPO_READ_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          echo "machine github.com login x-access-token password ${TOKEN}" > ~/.netrc
+          chmod 600 ~/.netrc
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: go vet ./...
+      - run: go build ./...
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/Project-Helianthus/*
+      GONOSUMDB: github.com/Project-Helianthus/*
+      GOPROXY: direct
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          TOKEN="${{ secrets.REPO_READ_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          echo "machine github.com login x-access-token password ${TOKEN}" > ~/.netrc
+          chmod 600 ~/.netrc
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: go test -race -count=1 ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/Project-Helianthus/*
+      GONOSUMDB: github.com/Project-Helianthus/*
+      GOPROXY: direct
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          TOKEN="${{ secrets.REPO_READ_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          echo "machine github.com login x-access-token password ${TOKEN}" > ~/.netrc
+          chmod 600 ~/.netrc
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: golangci/golangci-lint-action@v6
