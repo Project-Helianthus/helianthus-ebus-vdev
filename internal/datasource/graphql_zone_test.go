@@ -1,10 +1,17 @@
 package datasource
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 func TestGraphQLZoneSource_NoData(t *testing.T) {
@@ -89,6 +96,80 @@ func TestGraphQLZoneSource_DefaultStaleTTL(t *testing.T) {
 	}
 }
 
+func TestGraphQLZoneSource_SubscribeOnceWithMaintainedWebsocket(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+			Subprotocols: []string{"graphql-ws"},
+		})
+		if err != nil {
+			t.Errorf("websocket Accept() err = %v", err)
+			return
+		}
+		defer func() { _ = conn.CloseNow() }()
+
+		var init map[string]any
+		if err := wsjson.Read(r.Context(), conn, &init); err != nil {
+			t.Errorf("read connection_init: %v", err)
+			return
+		}
+		if init["type"] != "connection_init" {
+			t.Errorf("initial message type = %#v; want connection_init", init["type"])
+			return
+		}
+		if err := wsjson.Write(r.Context(), conn, map[string]string{"type": "connection_ack"}); err != nil {
+			t.Errorf("write connection_ack: %v", err)
+			return
+		}
+
+		var start map[string]any
+		if err := wsjson.Read(r.Context(), conn, &start); err != nil {
+			t.Errorf("read subscription start: %v", err)
+			return
+		}
+		if start["type"] != "start" {
+			t.Errorf("subscription message type = %#v; want start", start["type"])
+			return
+		}
+
+		event := map[string]any{
+			"type": "data",
+			"id":   "1",
+			"payload": map[string]any{"data": map[string]any{"zoneUpdate": map[string]any{
+				"id":                 "zone-2",
+				"currentTempC":       22.75,
+				"currentHumidityPct": 51.5,
+			}}},
+		}
+		if err := wsjson.Write(r.Context(), conn, event); err != nil {
+			t.Errorf("write subscription event: %v", err)
+			return
+		}
+		_ = conn.Close(websocket.StatusNormalClosure, "fixture complete")
+	}))
+	defer server.Close()
+
+	src := NewGraphQLZoneSource(GraphQLZoneConfig{
+		GatewayURL: "ws" + strings.TrimPrefix(server.URL, "http"),
+		ZoneID:     "zone-2",
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := src.subscribeOnce(ctx); err == nil || !strings.Contains(err.Error(), "websocket closed") {
+		t.Fatalf("subscribeOnce() err = %v; want normal websocket closure", err)
+	}
+
+	temp, err := src.Temperature()
+	if err != nil || temp != 22.75 {
+		t.Fatalf("Temperature() = %v, %v; want 22.75, nil", temp, err)
+	}
+	humidity, err := src.Humidity()
+	if err != nil || humidity != 51.5 {
+		t.Fatalf("Humidity() = %v, %v; want 51.5, nil", humidity, err)
+	}
+}
+
 func TestGraphQLZoneSource_ProcessMessage(t *testing.T) {
 	t.Parallel()
 
@@ -168,8 +249,9 @@ func TestGraphQLZoneSource_ConcurrentAccess(t *testing.T) {
 		}(i)
 		go func() {
 			defer wg.Done()
-			src.Temperature()
-			src.Humidity()
+			// Values are deliberately discarded; the race detector is the assertion.
+			_, _ = src.Temperature()
+			_, _ = src.Humidity()
 		}()
 	}
 	wg.Wait()

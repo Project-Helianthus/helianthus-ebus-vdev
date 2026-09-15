@@ -59,23 +59,20 @@ func (p *pipeTransport) Close() error {
 	return nil
 }
 
-// duplexPipe connects two endpoints: what side A writes, side B reads, and vice versa.
-type duplexPipe struct {
-	aToB *pipeTransport // A writes → B reads
-	bToA *pipeTransport // B writes → A reads
-}
-
 type pipeEnd struct {
 	read  *pipeTransport
 	write *pipeTransport
 }
 
-func (e *pipeEnd) ReadByte() (byte, error) { return e.read.ReadByte() }
+func (e *pipeEnd) ReadByte() (byte, error)     { return e.read.ReadByte() }
 func (e *pipeEnd) Write(d []byte) (int, error) { return e.write.Write(d) }
 func (e *pipeEnd) Close() error {
-	e.read.Close()
-	e.write.Close()
-	return nil
+	readErr := e.read.Close()
+	writeErr := e.write.Close()
+	if readErr != nil {
+		return readErr
+	}
+	return writeErr
 }
 
 // newDuplexPipe creates a bidirectional pipe. Returns (master side, slave side).
