@@ -64,7 +64,9 @@ devices:
     temp_jitter_c: 0.5
 `
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	os.WriteFile(path, []byte(yaml), 0644)
+	if err := os.WriteFile(path, []byte(yaml), 0644); err != nil {
+		t.Fatalf("WriteFile() err = %v", err)
+	}
 
 	cfg, err := Load(path)
 	if err != nil {

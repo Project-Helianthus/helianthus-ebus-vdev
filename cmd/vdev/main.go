@@ -41,7 +41,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("dial adapter: %v", err)
 	}
-	defer tr.Close()
+	defer func() {
+		if err := tr.Close(); err != nil {
+			log.Printf("close adapter transport: %v", err)
+		}
+	}()
 	log.Printf("connected to adapter %s (%s)", cfg.Adapter.Address, cfg.Adapter.Protocol)
 
 	// Build targets for all devices.
@@ -132,7 +136,7 @@ func dialTransport(cfg config.AdapterConfig) (transport.RawTransport, error) {
 	case "tcp-plain":
 		return transport.NewTCPPlainTransport(conn, readTimeout, writeTimeout), nil
 	default:
-		conn.Close()
+		_ = conn.Close() // best-effort cleanup; the unsupported protocol is the primary error
 		return nil, fmt.Errorf("unsupported protocol %q", cfg.Protocol)
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	ebuserrors "github.com/Project-Helianthus/helianthus-ebusgo/errors"
 	"github.com/Project-Helianthus/helianthus-ebusgo/emulation"
+	ebuserrors "github.com/Project-Helianthus/helianthus-ebusgo/errors"
 	"github.com/Project-Helianthus/helianthus-ebusgo/protocol"
 	"github.com/Project-Helianthus/helianthus-ebusgo/transport"
 )
@@ -135,7 +135,9 @@ func (sr *SlaveResponder) handleFrame(ctx context.Context, parsed ParsedFrame, t
 	resp, err := target.Emulate(event)
 	if err != nil {
 		// Addressed to us but unserviceable — send NACK.
-		sr.sendByte(protocol.SymbolNack)
+		if err := sr.sendByte(protocol.SymbolNack); err != nil {
+			return
+		}
 		return
 	}
 

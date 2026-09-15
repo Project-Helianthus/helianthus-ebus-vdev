@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 var (
@@ -129,7 +129,9 @@ func (s *GraphQLZoneSource) subscribeOnce(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("websocket dial: %w", err)
 	}
-	defer conn.CloseNow()
+	defer func() {
+		_ = conn.CloseNow() // best-effort abort after the subscription loop exits
+	}()
 
 	// Send connection_init.
 	if err := wsjson.Write(ctx, conn, map[string]string{"type": "connection_init"}); err != nil {
