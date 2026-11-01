@@ -493,13 +493,13 @@ func (publisher *LocalPlanPublisher) Publish(profile LocalProfile, binding Local
 func (publisher *LocalPlanPublisher) checkSuccessor(previous LocalPlan, next LocalPlan) error {
 	before := previous.Identity
 	after := next.Identity
-	if after.Worker < before.Worker {
-		return ErrLocalPlanStaleGeneration
-	}
-	if after.Worker == before.Worker && (after.Stream < before.Stream || after.Plan <= before.Plan) {
-		return ErrLocalPlanStaleGeneration
-	}
 	if after.Registration == before.Registration {
+		if after.Worker < before.Worker {
+			return ErrLocalPlanStaleGeneration
+		}
+		if after.Worker == before.Worker && (after.Stream < before.Stream || after.Plan <= before.Plan) {
+			return ErrLocalPlanStaleGeneration
+		}
 		if after.Source < before.Source {
 			return ErrLocalPlanStaleGeneration
 		}

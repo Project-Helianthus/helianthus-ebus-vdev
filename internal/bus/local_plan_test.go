@@ -841,6 +841,78 @@ func TestAA28AnotherKeyTakesAnAddressOnlyAfterRelease(t *testing.T) {
 	}
 }
 
+func TestAA28ReleasedAddressHasIndependentGenerationOrder(t *testing.T) {
+	keys := []struct {
+		name   string
+		change func(*LocalPlanBinding)
+	}{
+		{"subscriber", func(b *LocalPlanBinding) { b.Subscriber++ }},
+		{"epoch", func(b *LocalPlanBinding) { b.Epoch++ }},
+	}
+	orders := []struct {
+		name   string
+		change func(*LocalPlanBinding)
+	}{
+		{"newer plan control", func(b *LocalPlanBinding) { b.Plan++ }},
+		{"lower worker", func(b *LocalPlanBinding) { b.Worker--; b.Plan++ }},
+		{"lower stream", func(b *LocalPlanBinding) { b.Stream--; b.Plan++ }},
+		{"same plan", func(*LocalPlanBinding) {}},
+		{"lower plan", func(b *LocalPlanBinding) { b.Plan-- }},
+		{"lower source", func(b *LocalPlanBinding) { b.Source--; b.Plan++ }},
+		{"all counters restart", func(b *LocalPlanBinding) {
+			b.Worker, b.Stream, b.Plan, b.Source = 1, 1, 1, 1
+		}},
+	}
+	for _, key := range keys {
+		for _, order := range orders {
+			t.Run(key.name+"/"+order.name, func(t *testing.T) {
+				spy := aa28NewSpy()
+				publisher := aa28NewPublisher(t, spy)
+				first := aa28Publish(t, publisher, aa28Binding())
+				next := aa28Binding()
+				key.change(&next)
+				order.change(&next)
+				nextKey := LocalRegistrationKey{Subscriber: next.Subscriber, Address: aa28Address, Epoch: next.Epoch}
+				view := aa28View()
+				view.Key, view.Source = nextKey, next.Source
+				spy.registrations[nextKey] = view
+				now := LocalClockReading{Domain: aa28Domain, Tick: aa28Tick}
+
+				for _, state := range []LocalRegistrationState{LocalRegistrationActive, LocalRegistrationRetiring} {
+					incumbent := aa28View()
+					incumbent.State = state
+					spy.registrations[aa28Key()] = incumbent
+					if _, err := publisher.Publish(aa28Profile(), next, now); !errors.Is(err, ErrLocalPlanConflict) {
+						t.Fatalf("incumbent state %d: err = %v, want conflict", state, err)
+					}
+					current, held := publisher.Current(aa28Address)
+					if !held || len(spy.installed) != 1 {
+						t.Fatalf("conflict changed installation: held=%v installs=%d", held, len(spy.installed))
+					}
+					aa28WantEqual(t, current, first)
+				}
+
+				delete(spy.registrations, aa28Key())
+				plan, err := publisher.Publish(aa28Profile(), next, now)
+				if err != nil {
+					t.Fatalf("released address: %v", err)
+				}
+				want := aa28WantPlan()
+				want.Identity = LocalPlanIdentity{
+					Registration: nextKey, Worker: next.Worker, Stream: next.Stream, Plan: next.Plan, Source: next.Source,
+				}
+				aa28WantEqual(t, plan, want)
+				current, held := publisher.Current(aa28Address)
+				if !held || len(spy.installed) != 2 {
+					t.Fatalf("handoff not installed: held=%v installs=%d", held, len(spy.installed))
+				}
+				aa28WantEqual(t, current, want)
+				aa28WantEqual(t, spy.installed[1], want)
+			})
+		}
+	}
+}
+
 func TestAA28PublisherKeepsAddressesApart(t *testing.T) {
 	spy := aa28NewSpy()
 	publisher := aa28NewPublisher(t, spy)
