@@ -1,2 +1,4 @@
 AGENT-local.md
 /vdev
+/.cache/
+/.tmp/
