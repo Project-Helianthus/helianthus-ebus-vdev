@@ -20,6 +20,8 @@ var (
 	ErrStaleData = errors.New("zone source: data is stale")
 )
 
+const zoneSubscriptionQuery = `subscription { zone_update { id state { zone_room_temperature zone_room_humidity } } }`
+
 const (
 	defaultStaleTTL       = 5 * time.Minute
 	defaultReconnectMin   = 1 * time.Second
@@ -34,7 +36,7 @@ type GraphQLZoneConfig struct {
 	StaleTTL   time.Duration
 }
 
-// GraphQLZoneSource subscribes to a gateway's zoneUpdate GraphQL subscription
+// GraphQLZoneSource subscribes to a gateway's zone_update GraphQL subscription
 // and caches the latest temperature and humidity for a specific zone.
 type GraphQLZoneSource struct {
 	config GraphQLZoneConfig
@@ -149,7 +151,7 @@ func (s *GraphQLZoneSource) subscribeOnce(ctx context.Context) error {
 		"id":   "1",
 		"type": "start",
 		"payload": map[string]interface{}{
-			"query": `subscription { zoneUpdate { id currentTempC currentHumidityPct } }`,
+			"query": zoneSubscriptionQuery,
 		},
 	}
 	if err := wsjson.Write(ctx, conn, subMsg); err != nil {
@@ -183,10 +185,12 @@ type gqlMessage struct {
 type gqlDataPayload struct {
 	Data struct {
 		ZoneUpdate struct {
-			ID                 string   `json:"id"`
-			CurrentTempC       *float64 `json:"currentTempC"`
-			CurrentHumidityPct *float64 `json:"currentHumidityPct"`
-		} `json:"zoneUpdate"`
+			ID    string `json:"id"`
+			State struct {
+				CurrentTempC       *float64 `json:"zone_room_temperature"`
+				CurrentHumidityPct *float64 `json:"zone_room_humidity"`
+			} `json:"state"`
+		} `json:"zone_update"`
 	} `json:"data"`
 }
 
@@ -213,11 +217,11 @@ func (s *GraphQLZoneSource) processMessage(raw json.RawMessage) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if zone.CurrentTempC != nil {
-		s.lastTemp = zone.CurrentTempC
+	if zone.State.CurrentTempC != nil {
+		s.lastTemp = zone.State.CurrentTempC
 	}
-	if zone.CurrentHumidityPct != nil {
-		s.lastHumid = zone.CurrentHumidityPct
+	if zone.State.CurrentHumidityPct != nil {
+		s.lastHumid = zone.State.CurrentHumidityPct
 	}
 	s.lastUpdate = time.Now()
 }

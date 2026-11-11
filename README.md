@@ -23,7 +23,7 @@
   Gateway (master)              eBUS Network
 ┌──────────────────┐                 │
 │ GraphQL API      │                 │
-│ zoneUpdate sub   │──── master ─────┤
+│ zone_update sub   │──── master ─────┤
 └──────┬───────────┘                 │
        │ WebSocket subscription      │
        ▼                             │
@@ -178,3 +178,17 @@ helianthus-ebus-vdev/
 ## License
 
 GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
+
+## Gateway zone subscription
+
+The source requests `subscription { zone_update { id state { zone_room_temperature zone_room_humidity } } }`.
+It reads the nested `state` for the configured zone ID. Temperature remains in
+ degrees Celsius and humidity in percent. Missing or null measurements retain
+ each field's last known value; zero is a measurement. Matching zone events
+ refresh the existing shared freshness timeout. Reconnection and cancellation
+ behavior are unchanged. Previous field spellings are unsupported.
+
+This is a breaking consumer contract change coordinated with the gateway.
+Synthetic contract checks do not establish native qualification or physical
+validation. Release requires renewed affected security, hardware and candidate
+ evidence and the coordinated public documentation contract.

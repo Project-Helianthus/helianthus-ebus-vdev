@@ -1,0 +1,44 @@
+// Public gateway zone contract excerpt for issue #20.
+// Omitted code is outside this consumer contract.
+	zoneStateType := graphqlgo.NewObject(graphqlgo.ObjectConfig{
+		Name: "zone_state",
+		Fields: graphqlgo.Fields{
+			"zone_room_temperature": &graphqlgo.Field{
+				Description: "Zone room temperature; unit: celsius.",
+				Type:        graphqlgo.Float,
+				Resolve: func(params graphqlgo.ResolveParams) (any, error) {
+					state, ok := params.Source.(ZoneState)
+					if !ok {
+						return nil, nil
+					}
+					if state.CurrentTempC == nil {
+						return nil, nil
+					}
+					return *state.CurrentTempC, nil
+				},
+			},
+
+			"zone_room_humidity": &graphqlgo.Field{
+				Description: "Zone room relative humidity; unit: percent.",
+				Type:        graphqlgo.Float,
+				Resolve: func(params graphqlgo.ResolveParams) (any, error) {
+					state, ok := params.Source.(ZoneState)
+					if !ok {
+						return nil, nil
+					}
+					if state.CurrentHumidityPct == nil {
+						return nil, nil
+					}
+					return *state.CurrentHumidityPct, nil
+				},
+			},
+// ...
+			"state": &graphqlgo.Field{
+				Type: graphqlgo.NewNonNull(zoneStateType),
+				Resolve: func(params graphqlgo.ResolveParams) (any, error) {
+					zone, ok := params.Source.(Zone)
+					if !ok {
+						return ZoneState{}, nil
+					}
+					return zone.State, nil
+				},

@@ -1,0 +1,4 @@
+// Public gateway zone contract excerpt for issue #20.
+// Omitted code is outside this consumer contract.
+			"zone_update": &graphqlgo.Field{
+				Type: graphqlgo.NewNonNull(types.zoneType),
