@@ -1,0 +1,7 @@
+// Public gateway zone contract excerpt for issue #20.
+// Omitted code is outside this consumer contract.
+func (namingProofProvider) Zones() []Zone {
+	temp, humidity, target := 0.0, 42.5, 19.5
+	return []Zone{{ID: "zone:synthetic", State: ZoneState{CurrentTempC: &temp, CurrentHumidityPct: &humidity}, Config: ZoneConfig{TargetTempC: &target}}}
+// ...
+	r := graphqlgo.Do(graphqlgo.Params{Schema: s, RequestString: `{ zones { id state { zone_room_temperature zone_room_humidity } config { target_temp_c } } }`})

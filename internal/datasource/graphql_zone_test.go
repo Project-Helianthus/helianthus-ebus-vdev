@@ -2,9 +2,12 @@ package datasource
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -136,10 +139,9 @@ func TestGraphQLZoneSource_SubscribeOnceWithMaintainedWebsocket(t *testing.T) {
 		event := map[string]any{
 			"type": "data",
 			"id":   "1",
-			"payload": map[string]any{"data": map[string]any{"zoneUpdate": map[string]any{
-				"id":                 "zone-2",
-				"currentTempC":       22.75,
-				"currentHumidityPct": 51.5,
+			"payload": map[string]any{"data": map[string]any{"zone_update": map[string]any{
+				"id":    "zone-2",
+				"state": map[string]any{"zone_room_temperature": 22.75, "zone_room_humidity": 51.5},
 			}}},
 		}
 		if err := wsjson.Write(r.Context(), conn, event); err != nil {
@@ -178,7 +180,7 @@ func TestGraphQLZoneSource_ProcessMessage(t *testing.T) {
 		ZoneID:     "zone-2",
 	})
 
-	msg := []byte(`{"type":"data","id":"1","payload":{"data":{"zoneUpdate":{"id":"zone-2","currentTempC":22.5,"currentHumidityPct":55.0}}}}`)
+	msg := []byte(`{"type":"data","id":"1","payload":{"data":{"zone_update":{"id":"zone-2","state":{"zone_room_temperature":22.5,"zone_room_humidity":55.0}}}}}`)
 	src.processMessage(msg)
 
 	temp, err := src.Temperature()
@@ -206,7 +208,7 @@ func TestGraphQLZoneSource_ProcessMessage_WrongZone(t *testing.T) {
 		ZoneID:     "zone-2",
 	})
 
-	msg := []byte(`{"type":"data","id":"1","payload":{"data":{"zoneUpdate":{"id":"zone-1","currentTempC":22.5,"currentHumidityPct":55.0}}}}`)
+	msg := []byte(`{"type":"data","id":"1","payload":{"data":{"zone_update":{"id":"zone-1","state":{"zone_room_temperature":22.5,"zone_room_humidity":55.0}}}}}`)
 	src.processMessage(msg)
 
 	_, err := src.Temperature()
@@ -260,5 +262,77 @@ func TestGraphQLZoneSource_ConcurrentAccess(t *testing.T) {
 	_, err := src.Temperature()
 	if err != nil {
 		t.Fatalf("Temperature() err = %v after concurrent access", err)
+	}
+}
+
+func TestGraphQLZoneSource_PartialState(t *testing.T) {
+	for _, tc := range []struct {
+		name, zone  string
+		temp, humid float64
+	}{
+		{"present", `{"id":"zone-2","state":{"zone_room_temperature":-2.5,"zone_room_humidity":61.25}}`, -2.5, 61.25},
+		{"zero", `{"id":"zone-2","state":{"zone_room_temperature":0,"zone_room_humidity":0}}`, 0, 0},
+		{"missing humidity", `{"id":"zone-2","state":{"zone_room_temperature":17}}`, 17, 45},
+		{"null temperature", `{"id":"zone-2","state":{"zone_room_temperature":null,"zone_room_humidity":32}}`, 21.5, 32},
+		{"null humidity", `{"id":"zone-2","state":{"zone_room_temperature":18,"zone_room_humidity":null}}`, 18, 45},
+		{"missing temperature", `{"id":"zone-2","state":{"zone_room_humidity":33}}`, 21.5, 33},
+		{"absent state", `{"id":"zone-2"}`, 21.5, 45},
+		{"null state", `{"id":"zone-2","state":null}`, 21.5, 45},
+		{"wrong identity", `{"id":"zone-3","state":{"zone_room_temperature":99,"zone_room_humidity":99}}`, 21.5, 45},
+		{"missing identity", `{"state":{"zone_room_temperature":99,"zone_room_humidity":99}}`, 21.5, 45},
+		{"old fields", `{"id":"zone-2","state":{"currentTempC":99,"currentHumidityPct":99}}`, 21.5, 45},
+		{"flattened fields", `{"id":"zone-2","zone_room_temperature":99,"zone_room_humidity":99}`, 21.5, 45},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := NewGraphQLZoneSource(GraphQLZoneConfig{ZoneID: "zone-2"})
+			src.Update(21.5, 45)
+			src.processMessage([]byte(`{"type":"data","payload":{"data":{"zone_update":` + tc.zone + `}}}`))
+			a, e := src.Temperature()
+			b, f := src.Humidity()
+			if a != tc.temp || b != tc.humid || e != nil || f != nil {
+				t.Fatalf("got %v %v %v %v", a, b, e, f)
+			}
+		})
+	}
+	src := NewGraphQLZoneSource(GraphQLZoneConfig{ZoneID: "zone-2"})
+	src.processMessage([]byte(`{"type":"data","payload":{"data":{"zoneUpdate":{"id":"zone-2","currentTempC":99,"currentHumidityPct":99}}}}`))
+	if !src.lastUpdate.IsZero() || src.lastTemp != nil || src.lastHumid != nil {
+		t.Fatal("old root admitted")
+	}
+}
+
+func TestGraphQLZoneSource_GatewayContract(t *testing.T) {
+	// Check the request without dialing against checked-in public gateway
+	// contract excerpts. Tests must not depend on an external source checkout.
+	root := filepath.Join("testdata", "gateway-zone-contract")
+	for file, tokens := range map[string][]string{
+		"subscription_schema.go":  {`"zone_update":`, "graphqlgo.NewNonNull(types.zoneType)"},
+		"schema_types.go":         {`"state":`, "graphqlgo.NewNonNull(zoneStateType)", `"zone_room_temperature":`, `"zone_room_humidity":`},
+		"naming_contract_test.go": {`zones { id state { zone_room_temperature zone_room_humidity }`, "temp, humidity, target := 0.0, 42.5, 19.5"},
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, file+".txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, token := range tokens {
+			if !strings.Contains(string(raw), token) {
+				t.Fatalf("%s missing %s", file, token)
+			}
+		}
+	}
+	if zoneSubscriptionQuery != `subscription { zone_update { id state { zone_room_temperature zone_room_humidity } } }` {
+		t.Fatal("request shape differs")
+	}
+	fixture := map[string]any{"type": "data", "payload": map[string]any{"data": map[string]any{"zone_update": map[string]any{"id": "zone:synthetic", "state": map[string]any{"zone_room_temperature": 0.0, "zone_room_humidity": 42.5}}}}}
+	raw, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := NewGraphQLZoneSource(GraphQLZoneConfig{ZoneID: "zone:synthetic"})
+	src.processMessage(raw)
+	a, e := src.Temperature()
+	b, f := src.Humidity()
+	if a != 0 || b != 42.5 || e != nil || f != nil {
+		t.Fatalf("gateway values changed: %v %v %v %v", a, b, e, f)
 	}
 }
