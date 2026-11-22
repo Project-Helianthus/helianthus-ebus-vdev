@@ -15,7 +15,7 @@
 
 - Low-level transport framing and bus primitives (use `helianthus-ebusgo`).
 - Registry/provider model or schema definitions (use `helianthus-ebusreg`).
-- Gateway runtime, GraphQL API surfaces, or master-side bus operations (use `helianthus-ebusgateway`).
+- Gateway runtime, GraphQL API surfaces, or master-side bus operations (use `helianthus-gateway`).
 
 ## How It Works
 
@@ -133,11 +133,11 @@ go test -race -count=1 ./...
 helianthus-ebusgo  ->  helianthus-ebus-vdev
  (transport/proto)      (virtual device emulation)
 
-helianthus-ebusgo  ->  helianthus-ebusreg  ->  helianthus-ebusgateway
+helianthus-ebusgo  ->  helianthus-ebusreg  ->  helianthus-gateway
  (transport/proto)     (registry/schema)        (runtime/API)
 ```
 
-`helianthus-ebus-vdev` depends only on `helianthus-ebusgo` for transport, protocol, emulation, and type codecs. It has no dependency on `helianthus-ebusreg` or `helianthus-ebusgateway`.
+`helianthus-ebus-vdev` depends only on `helianthus-ebusgo` for transport, protocol, emulation, and type codecs. It has no dependency on `helianthus-ebusreg` or `helianthus-gateway`.
 
 ## Project Structure
 
@@ -169,11 +169,11 @@ helianthus-ebus-vdev/
 
 ## Link Map
 
-- `helianthus-ebusgo`: https://github.com/d3vi1/helianthus-ebusgo
-- `helianthus-ebusgateway`: https://github.com/d3vi1/helianthus-ebusgateway
-- VR90 emulation protocol docs: https://github.com/d3vi1/helianthus-docs-ebus/blob/main/protocols/ebus-vaillant-vr90-emulation.md
-- eBUS overview: https://github.com/d3vi1/helianthus-docs-ebus/blob/main/protocols/ebus-overview.md
-- Issue tracker: https://github.com/d3vi1/helianthus-ebus-vdev/issues
+- `helianthus-ebusgo`: https://github.com/Project-Helianthus/helianthus-ebusgo
+- `helianthus-gateway`: https://github.com/Project-Helianthus/helianthus-gateway
+- VR90 emulation protocol docs: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/ebus-vaillant-vr90-emulation.md
+- eBUS overview: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/ebus-overview.md
+- Issue tracker: https://github.com/Project-Helianthus/helianthus-ebus-vdev/issues
 
 ## License
 
